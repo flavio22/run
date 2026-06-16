@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Run · Walk · Run</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --run: #FF4D1C;
+    --walk: #00C896;
+    --bg: #0D0D0F;
+    --surface: #18181C;
+    --border: #2A2A30;
+    --text: #F0F0F0;
+    --muted: #666672;
+    --radius: 16px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* ── SCREENS ── */
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; transition: opacity .3s, transform .3s; }
+  .screen.hidden { opacity: 0; pointer-events: none; transform: translateY(20px); }
+
+  /* ── SETUP SCREEN ── */
+  #setup {
+    padding: env(safe-area-inset-top, 20px) 24px 40px;
+    overflow-y: auto;
+    gap: 0;
+  }
+
+  .logo {
+    margin-top: 12px;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .logo h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .logo h1 span.r { color: var(--run); }
+  .logo h1 span.w { color: var(--walk); }
+  .logo p {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .interval-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .interval-block {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .interval-block label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .interval-block label.run-label { color: var(--run); }
+  .interval-block label.walk-label { color: var(--walk); }
+
+  .stepper {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    width: 100%;
+  }
+  .stepper button {
+    width: 44px; height: 48px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text); font-size: 22px; font-weight: 300;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s;
+    flex-shrink: 0;
+  }
+  .stepper button:active { background: rgba(255,255,255,.08); }
+  .stepper .val {
+    flex: 1; text-align: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 20px; font-weight: 700;
+  }
+  .stepper .unit {
+    font-size: 11px; color: var(--muted); padding-right: 10px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .sep { color: var(--muted); font-size: 20px; font-weight: 300; margin-top: 14px; }
+
+  .rounds-row {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .rounds-row span { font-size: 15px; }
+  .rounds-row .stepper { width: 140px; }
+
+  .gps-row {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .gps-row .info { line-height: 1.4; }
+  .gps-row .info strong { font-size: 15px; }
+  .gps-row .info small { font-size: 12px; color: var(--muted); display: block; }
+
+  /* toggle */
+  .toggle { position: relative; width: 50px; height: 28px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle .slider {
+    position: absolute; inset: 0;
+    background: var(--border); border-radius: 28px; cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle .slider::before {
+    content: ''; position: absolute;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; left: 3px; top: 3px;
+    transition: transform .2s;
+  }
+  .toggle input:checked + .slider { background: var(--walk); }
+  .toggle input:checked + .slider::before { transform: translateX(22px); }
+
+  .btn-start {
+    display: block; width: 100%;
+    padding: 18px;
+    background: var(--run);
+    color: #fff; font-family: 'Space Grotesk', sans-serif;
+    font-size: 17px; font-weight: 700; letter-spacing: .5px;
+    border: none; border-radius: var(--radius); cursor: pointer;
+    margin-top: 8px;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn-start:active { opacity: .85; transform: scale(.98); }
+
+  /* ── ACTIVE SCREEN ── */
+  #active {
+    justify-content: space-between;
+    padding: env(safe-area-inset-top, 20px) 0 env(safe-area-inset-bottom, 24px);
+  }
+
+  /* top bar */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 20px 0;
+  }
+  .top-bar .session-label {
+    font-size: 12px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .btn-end {
+    background: none; border: 1px solid var(--border);
+    color: var(--muted); font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 6px 14px; border-radius: 20px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .btn-end:active { border-color: var(--run); color: var(--run); }
+
+  /* phase display */
+  .phase-area {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+    padding: 0 24px;
+    position: relative;
+  }
+
+  .phase-ring {
+    position: relative;
+    width: 220px; height: 220px;
+    margin-bottom: 8px;
+  }
+  .phase-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .phase-ring .ring-bg { fill: none; stroke: var(--border); stroke-width: 8; }
+  .phase-ring .ring-fg { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset .5s linear, stroke .4s; }
+  .ring-center {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .phase-name {
+    font-size: 13px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .phase-time {
+    font-family: 'Space Mono', monospace;
+    font-size: 52px; font-weight: 700; line-height: 1;
+    letter-spacing: -2px;
+  }
+  .phase-time.run-color { color: var(--run); }
+  .phase-time.walk-color { color: var(--walk); }
+
+  .round-badge {
+    font-size: 13px; color: var(--muted); font-weight: 600;
+    letter-spacing: .5px;
+  }
+  .round-badge span { color: var(--text); }
+
+  /* stats row */
+  .stats-row {
+    display: flex; gap: 12px; padding: 0 20px;
+  }
+  .stat-card {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px 12px; text-align: center;
+  }
+  .stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px; font-weight: 700; line-height: 1;
+  }
+  .stat-lbl {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--muted); margin-top: 4px;
+  }
+
+  /* controls */
+  .controls {
+    display: flex; gap: 16px; padding: 0 24px;
+    align-items: center; justify-content: center;
+  }
+  .btn-ctrl {
+    display: flex; align-items: center; justify-content: center;
+    border: none; cursor: pointer; border-radius: 50%;
+    transition: transform .1s, opacity .15s;
+  }
+  .btn-ctrl:active { transform: scale(.93); opacity: .8; }
+  .btn-skip {
+    width: 52px; height: 52px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 22px;
+  }
+  .btn-pause {
+    width: 72px; height: 72px;
+    background: var(--run); color: #fff; font-size: 28px;
+  }
+  .btn-pause.walk-mode { background: var(--walk); }
+
+  /* next phase pill */
+  .next-pill {
+    text-align: center;
+    font-size: 12px; color: var(--muted); font-weight: 600;
+    letter-spacing: .8px;
+  }
+  .next-pill span { color: var(--text); }
+
+  /* ── DONE SCREEN ── */
+  #done {
+    align-items: center; justify-content: center; gap: 20px;
+    padding: 40px 24px;
+  }
+  #done .trophy { font-size: 72px; }
+  #done h2 { font-size: 28px; font-weight: 700; }
+  #done p { font-size: 15px; color: var(--muted); text-align: center; line-height: 1.5; }
+  .summary-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 12px; width: 100%;
+  }
+  .summary-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; text-align: center;
+  }
+  .summary-card .s-val {
+    font-family: 'Space Mono', monospace; font-size: 26px; font-weight: 700;
+  }
+  .summary-card .s-lbl {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--muted); margin-top: 4px;
+  }
+  .btn-restart {
+    display: block; width: 100%;
+    padding: 18px; background: var(--run);
+    color: #fff; font-family: 'Space Grotesk', sans-serif;
+    font-size: 17px; font-weight: 700; border: none; border-radius: var(--radius);
+    cursor: pointer; transition: opacity .15s;
+  }
+  .btn-restart:active { opacity: .85; }
+
+  /* GPS error */
+  .gps-err {
+    font-size: 11px; color: #FF9500; text-align: center; margin-top: -8px; margin-bottom: 4px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ───── SETUP ───── -->
+<div class="screen" id="setup">
+  <div class="logo">
+    <h1><span class="r">RUN</span> · <span class="w">WALK</span> · <span class="r">RUN</span></h1>
+    <p>Interval trainer</p>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Intervalli</div>
+    <div class="interval-row">
+      <div class="interval-block">
+        <label class="run-label">🏃 Corsa</label>
+        <div class="stepper">
+          <button onclick="adj('run',-1)">−</button>
+          <span class="val" id="runVal">2</span>
+          <span class="unit">min</span>
+          <button onclick="adj('run',1)">+</button>
+        </div>
+      </div>
+      <div class="sep">↔</div>
+      <div class="interval-block">
+        <label class="walk-label">🚶 Camminata</label>
+        <div class="stepper">
+          <button onclick="adj('walk',-1)">−</button>
+          <span class="val" id="walkVal">1</span>
+          <span class="unit">min</span>
+          <button onclick="adj('walk',1)">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Ripetizioni</div>
+    <div class="rounds-row">
+      <span>Quante volte?</span>
+      <div class="stepper" style="width:140px">
+        <button onclick="adj('rounds',-1)">−</button>
+        <span class="val" id="roundsVal">6</span>
+        <span class="unit">giri</span>
+        <button onclick="adj('rounds',1)">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">GPS</div>
+    <div class="gps-row">
+      <div class="info">
+        <strong>Traccia distanza</strong>
+        <small>Richiede accesso alla posizione</small>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="gpsToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="gps-err" id="gpsErr">GPS non disponibile — solo timer attivo.</p>
+  </div>
+
+  <button class="btn-start" onclick="startSession()">▶ Inizia Allenamento</button>
+</div>
+
+<!-- ───── ACTIVE ───── -->
+<div class="screen hidden" id="active">
+  <div class="top-bar">
+    <span class="session-label" id="sessionLabel">Sessione attiva</span>
+    <button class="btn-end" onclick="endSession()">Fine</button>
+  </div>
+
+  <div class="phase-area">
+    <div class="phase-ring">
+      <svg viewBox="0 0 220 220" width="220" height="220">
+        <circle class="ring-bg" cx="110" cy="110" r="96"/>
+        <circle class="ring-fg" id="ringFg" cx="110" cy="110" r="96"
+          stroke-dasharray="603.2" stroke-dashoffset="0" stroke="#FF4D1C"/>
+      </svg>
+      <div class="ring-center">
+        <div class="phase-name" id="phaseName">CORSA</div>
+        <div class="phase-time run-color" id="phaseTime">2:00</div>
+      </div>
+    </div>
+    <div class="round-badge">Giro <span id="roundCur">1</span> di <span id="roundTot">6</span></div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-val" id="statKm">0.00</div>
+      <div class="stat-lbl">km</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statTime">00:00</div>
+      <div class="stat-lbl">Tempo totale</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statPace">—</div>
+      <div class="stat-lbl">Pace</div>
+    </div>
+  </div>
+
+  <div class="next-pill" id="nextPill">Prossima: <span>Camminata 1:00</span></div>
+
+  <div class="controls">
+    <button class="btn-ctrl btn-skip" onclick="skipPhase()" title="Salta fase">⏭</button>
+    <button class="btn-ctrl btn-pause" id="btnPause" onclick="togglePause()">⏸</button>
+    <button class="btn-ctrl btn-skip" onclick="prevPhase()" title="Fase precedente">⏮</button>
+  </div>
+</div>
+
+<!-- ───── DONE ───── -->
+<div class="screen hidden" id="done">
+  <div class="trophy">🏅</div>
+  <h2>Allenamento completato!</h2>
+  <p id="doneMsg">Ottimo lavoro! Ecco il riepilogo della tua sessione.</p>
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="s-val" id="doneKm">—</div>
+      <div class="s-lbl">km percorsi</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-val" id="doneTime">—</div>
+      <div class="s-lbl">Tempo totale</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-val" id="donePace">—</div>
+      <div class="s-lbl">Pace medio</div>
+    </div>
+    <div class="summary-card">
+      <div class="s-val" id="doneRounds">—</div>
+      <div class="s-lbl">Giri completati</div>
+    </div>
+  </div>
+  <button class="btn-restart" onclick="goSetup()">↩ Nuovo allenamento</button>
+</div>
+
+<script>
+// ── STATE ──
+const cfg = { run: 2, walk: 1, rounds: 6 };
+let phase = 'run'; // 'run' | 'walk'
+let roundCur = 1;
+let phaseSecsLeft = 0;
+let totalSecs = 0;
+let paused = false;
+let tickTimer = null;
+let gpsWatcher = null;
+let totalKm = 0;
+let lastPos = null;
+let useGPS = true;
+let phaseTotalSecs = 0;
+
+// ── SETUP STEPPERS ──
+const limits = { run: [1,30], walk: [1,30], rounds: [1,30] };
+function adj(key, d) {
+  cfg[key] = Math.min(limits[key][1], Math.max(limits[key][0], cfg[key] + d));
+  document.getElementById(key + 'Val').textContent = cfg[key];
+}
+
+// ── AUDIO ──
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(freq, dur, vol = 0.4) {
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.connect(g); g.connect(ctx.destination);
+  osc.frequency.value = freq;
+  g.gain.setValueAtTime(vol, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+  osc.start(); osc.stop(ctx.currentTime + dur);
+}
+function beepRun()  { beep(880, .12); setTimeout(()=>beep(1100,.15),.13*1000); }
+function beepWalk() { beep(440, .15); setTimeout(()=>beep(330,.18),.16*1000); }
+function beepEnd()  { [600,700,800,900].forEach((f,i)=>setTimeout(()=>beep(f,.2),i*200)); }
+
+// ── GPS ──
+function startGPS() {
+  if (!navigator.geolocation || !useGPS) return;
+  gpsWatcher = navigator.geolocation.watchPosition(pos => {
+    if (lastPos) {
+      const d = haversine(lastPos.coords, pos.coords);
+      if (d < 0.5) totalKm += d; // ignore jumps > 500m
+    }
+    lastPos = pos;
+  }, err => {
+    document.getElementById('gpsErr').style.display = 'block';
+    useGPS = false;
+  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 });
+}
+function stopGPS() {
+  if (gpsWatcher) { navigator.geolocation.clearWatch(gpsWatcher); gpsWatcher = null; }
+}
+function haversine(a, b) {
+  const R = 6371, dLat = rad(b.latitude - a.latitude), dLon = rad(b.longitude - a.longitude);
+  const s = Math.sin(dLat/2)**2 + Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+function rad(d) { return d * Math.PI / 180; }
+
+// ── SESSION ──
+function startSession() {
+  ctx.resume();
+  useGPS = document.getElementById('gpsToggle').checked;
+  totalKm = 0; lastPos = null; totalSecs = 0;
+  roundCur = 1; phase = 'run'; paused = false;
+  setPhase('run', true);
+  showScreen('active');
+  startGPS();
+  startTick();
+  updateStats();
+  document.getElementById('roundTot').textContent = cfg.rounds;
+  document.getElementById('sessionLabel').textContent = 'Sessione attiva';
+}
+
+function setPhase(p, first = false) {
+  phase = p;
+  phaseTotalSecs = cfg[p] * 60;
+  phaseSecsLeft = phaseTotalSecs;
+  const isRun = p === 'run';
+  document.getElementById('phaseName').textContent = isRun ? '🏃 CORSA' : '🚶 CAMMINATA';
+  const el = document.getElementById('phaseTime');
+  el.className = 'phase-time ' + (isRun ? 'run-color' : 'walk-color');
+  document.getElementById('btnPause').className = 'btn-ctrl btn-pause' + (isRun ? '' : ' walk-mode');
+  document.getElementById('ringFg').style.stroke = isRun ? '#FF4D1C' : '#00C896';
+  updateRing();
+  updateTimeDisplay();
+  updateNext();
+  if (!first) { isRun ? beepRun() : beepWalk(); }
+  if (first) beepRun();
+}
+
+function nextPhase() {
+  if (phase === 'run') {
+    setPhase('walk');
+  } else {
+    if (roundCur >= cfg.rounds) { finishSession(); return; }
+    roundCur++;
+    document.getElementById('roundCur').textContent = roundCur;
+    setPhase('run');
+  }
+}
+
+function skipPhase() { nextPhase(); }
+function prevPhase() {
+  if (phase === 'walk') { setPhase('run'); return; }
+  if (roundCur > 1) { roundCur--; document.getElementById('roundCur').textContent = roundCur; setPhase('walk'); }
+}
+
+function startTick() {
+  clearInterval(tickTimer);
+  tickTimer = setInterval(() => {
+    if (paused) return;
+    totalSecs++;
+    phaseSecsLeft--;
+    if (phaseSecsLeft <= 0) { nextPhase(); return; }
+    updateTimeDisplay();
+    updateRing();
+    updateStats();
+  }, 1000);
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('btnPause').textContent = paused ? '▶' : '⏸';
+  document.getElementById('sessionLabel').textContent = paused ? '⏸ In pausa' : 'Sessione attiva';
+}
+
+function updateTimeDisplay() {
+  const m = Math.floor(phaseSecsLeft/60), s = phaseSecsLeft % 60;
+  document.getElementById('phaseTime').textContent = m + ':' + String(s).padStart(2,'0');
+}
+
+function updateRing() {
+  const circ = 603.2;
+  const progress = 1 - phaseSecsLeft / phaseTotalSecs;
+  document.getElementById('ringFg').style.strokeDashoffset = circ * (1 - progress);
+}
+
+function updateStats() {
+  document.getElementById('statKm').textContent = totalKm.toFixed(2);
+  const m = Math.floor(totalSecs/60), s = totalSecs % 60;
+  document.getElementById('statTime').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  if (totalKm > 0.05 && totalSecs > 0) {
+    const pace = (totalSecs / 60) / totalKm;
+    const pm = Math.floor(pace), ps = Math.round((pace - pm) * 60);
+    document.getElementById('statPace').textContent = pm + ':' + String(ps).padStart(2,'0');
+  } else {
+    document.getElementById('statPace').textContent = '—';
+  }
+}
+
+function updateNext() {
+  const nextIsRun = phase === 'walk';
+  const nextMins = nextIsRun ? cfg.run : cfg.walk;
+  const label = nextIsRun ? `🏃 Corsa ${nextMins}:00` : `🚶 Camminata ${nextMins}:00`;
+  const isLast = phase === 'walk' && roundCur >= cfg.rounds;
+  document.getElementById('nextPill').innerHTML = isLast
+    ? '<span>Fine allenamento!</span>'
+    : `Prossima: <span>${label}</span>`;
+}
+
+function endSession() {
+  clearInterval(tickTimer);
+  stopGPS();
+  finishUI();
+}
+
+function finishSession() {
+  clearInterval(tickTimer);
+  stopGPS();
+  beepEnd();
+  finishUI();
+}
+
+function finishUI() {
+  const m = Math.floor(totalSecs/60), s = totalSecs % 60;
+  const timeStr = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+  document.getElementById('doneKm').textContent = totalKm.toFixed(2);
+  document.getElementById('doneTime').textContent = timeStr;
+  document.getElementById('doneRounds').textContent = roundCur;
+  if (totalKm > 0.05) {
+    const pace = (totalSecs / 60) / totalKm;
+    const pm = Math.floor(pace), ps = Math.round((pace - pm) * 60);
+    document.getElementById('donePace').textContent = pm + ':' + String(ps).padStart(2,'0') + '/km';
+  } else {
+    document.getElementById('donePace').textContent = 'N/A';
+  }
+  showScreen('done');
+}
+
+function goSetup() { showScreen('setup'); }
+
+function showScreen(id) {
+  ['setup','active','done'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+// ── INIT ──
+document.getElementById('roundCur').textContent = '1';
+</script>
+</body>
+</html>
