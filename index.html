@@ -496,6 +496,41 @@ function beepRun()  { beep(880, .12); setTimeout(()=>beep(1100,.15),.13*1000); }
 function beepWalk() { beep(440, .15); setTimeout(()=>beep(330,.18),.16*1000); }
 function beepEnd()  { [600,700,800,900].forEach((f,i)=>setTimeout(()=>beep(f,.2),i*200)); }
 
+// ── VOCE ──
+let voices = [];
+function loadVoices() {
+  voices = speechSynthesis.getVoices();
+}
+speechSynthesis.onvoiceschanged = loadVoices;
+loadVoices();
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'it-IT';
+  utt.rate = 0.95;
+  utt.pitch = 1.0;
+  utt.volume = 1.0;
+  // cerca voce italiana, altrimenti usa default
+  const itVoice = voices.find(v => v.lang.startsWith('it'));
+  if (itVoice) utt.voice = itVoice;
+  speechSynthesis.speak(utt);
+}
+
+function announceRun(mins) {
+  speak(`Corri per ${mins} minut${mins === 1 ? 'o' : 'i'}!`);
+}
+function announceWalk(mins) {
+  speak(`Cammina per ${mins} minut${mins === 1 ? 'o' : 'i'}!`);
+}
+function announceEnd() {
+  speak('Allenamento completato! Ottimo lavoro!');
+}
+function announceCountdown() {
+  speak('Pronto… via!');
+}
+
 // ── GPS ──
 function startGPS() {
   if (!navigator.geolocation || !useGPS) return;
@@ -548,8 +583,11 @@ function setPhase(p, first = false) {
   updateRing();
   updateTimeDisplay();
   updateNext();
-  if (!first) { isRun ? beepRun() : beepWalk(); }
-  if (first) beepRun();
+  if (!first) {
+    if (isRun) { beepRun(); announceRun(cfg.run); }
+    else { beepWalk(); announceWalk(cfg.walk); }
+  }
+  if (first) { beepRun(); setTimeout(() => announceRun(cfg.run), 300); }
 }
 
 function nextPhase() {
@@ -632,6 +670,7 @@ function finishSession() {
   clearInterval(tickTimer);
   stopGPS();
   beepEnd();
+  announceEnd();
   finishUI();
 }
 
